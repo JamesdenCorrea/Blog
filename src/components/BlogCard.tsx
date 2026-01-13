@@ -2,7 +2,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Blog } from '../types';
 
-// Props interface - defines what data this component receives
 interface BlogCardProps {
     blog: Blog;
     currentUserId?: string;
@@ -10,7 +9,6 @@ interface BlogCardProps {
 }
 
 const BlogCard: React.FC<BlogCardProps> = ({ blog, currentUserId, onDelete }) => {
-    // Check if current user is the author of this blog
     const isAuthor = currentUserId === blog.author_id;
 
     return (
@@ -23,7 +21,6 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, currentUserId, onDelete }) =>
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 transition: 'box-shadow 0.2s ease',
             }}
-            // Add hover effect
             onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
             }}
@@ -31,6 +28,25 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, currentUserId, onDelete }) =>
                 e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
             }}
         >
+            {/* Featured Image - displayed at the top if exists */}
+            {blog.image_url && (
+                <Link to={`/blog/${blog.id}`}>
+                    <img
+                        src={blog.image_url}
+                        alt={blog.title}
+                        style={{
+                            width: '100%',
+                            height: '250px',
+                            objectFit: 'cover',
+                            borderRadius: '8px',
+                            marginBottom: '15px',
+                            cursor: 'pointer',
+                            display: 'block'
+                        }}
+                    />
+                </Link>
+            )}
+
             {/* Blog title - clickable link to full post */}
             <Link
                 to={`/blog/${blog.id}`}
@@ -43,7 +59,6 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, currentUserId, onDelete }) =>
                         color: '#2196F3',
                         cursor: 'pointer'
                     }}
-                    // Change color on hover
                     onMouseEnter={(e) => {
                         e.currentTarget.style.color = '#1976D2';
                     }}
@@ -61,7 +76,8 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, currentUserId, onDelete }) =>
                 gap: '15px',
                 marginBottom: '15px',
                 fontSize: '14px',
-                color: '#666'
+                color: '#666',
+                flexWrap: 'wrap'
             }}>
                 <div>
                     <strong>By:</strong> {blog.author_email || 'Unknown Author'}
@@ -141,5 +157,4 @@ const BlogCard: React.FC<BlogCardProps> = ({ blog, currentUserId, onDelete }) =>
     );
 };
 
-// Export as default - IMPORTANT: This allows importing with: import BlogCard from './BlogCard'
 export default BlogCard;

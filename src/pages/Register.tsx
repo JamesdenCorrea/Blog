@@ -8,23 +8,28 @@ const Register: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
 
+    // Local state for form inputs
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
+        e.preventDefault();  // Prevent page reload
+        setError('');        // Clear any previous errors
+        setLoading(true);    // Show loading state
 
         try {
+            // Dispatch register action with email and password
+            // unwrap() throws an error if registration fails
             await dispatch(register({ email, password })).unwrap();
-            navigate('/');
+            navigate('/');  // Redirect to home page on success
         } catch (err: any) {
+            // Show error message if registration fails
             setError(err || 'Registration failed');
         } finally {
-            setLoading(false);
+            setLoading(false);  // Stop loading
         }
     };
 
@@ -32,6 +37,7 @@ const Register: React.FC = () => {
         <div style={{ maxWidth: '400px', margin: '50px auto' }}>
             <h2>Register</h2>
 
+            {/* Show error message if exists */}
             {error && (
                 <div style={{
                     backgroundColor: '#ffebee',
@@ -50,7 +56,7 @@ const Register: React.FC = () => {
                     <input
                         type="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => setEmail(e.target.value)}  // Update email state
                         required
                         style={{
                             width: '100%',
@@ -66,9 +72,9 @@ const Register: React.FC = () => {
                     <input
                         type="password"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => setPassword(e.target.value)}  // Update password state
                         required
-                        minLength={6}
+                        minLength={6}  // Supabase requires minimum 6 characters
                         style={{
                             width: '100%',
                             padding: '10px',

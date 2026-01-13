@@ -92,6 +92,21 @@ const BlogDetail: React.FC = () => {
                 backgroundColor: 'white',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}>
+                {/* Featured Image */}
+                {currentBlog.image_url && (
+                    <img
+                        src={currentBlog.image_url}
+                        alt={currentBlog.title}
+                        style={{
+                            width: '100%',
+                            maxHeight: '500px',
+                            objectFit: 'cover',
+                            borderRadius: '8px',
+                            marginBottom: '30px'
+                        }}
+                    />
+                )}
+
                 {/* Blog title */}
                 <h1 style={{
                     marginTop: 0,

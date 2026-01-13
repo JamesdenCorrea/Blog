@@ -8,19 +8,22 @@ const Login: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
 
+    // Local state for form inputs
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
         try {
+            // Dispatch login action
             await dispatch(login({ email, password })).unwrap();
-            navigate('/');
+            navigate('/');  // Redirect to home on success
         } catch (err: any) {
             setError(err || 'Login failed');
         } finally {

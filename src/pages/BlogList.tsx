@@ -17,30 +17,29 @@ const BlogList: React.FC = () => {
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
     // Fetch blogs when component mounts or page/sort changes
+    // IMPORTANT: Now passes BOTH page and sortOrder to the database
+    // This ensures sorting applies to ALL blogs, not just current page
     useEffect(() => {
-        dispatch(fetchBlogs(currentPage));
-    }, [dispatch, currentPage]);
+        dispatch(fetchBlogs({ page: currentPage, sortOrder }));
+    }, [dispatch, currentPage, sortOrder]); // Re-fetch when either changes
 
     // Handle blog deletion
     const handleDelete = async (id: string) => {
         // Ask for confirmation before deleting
         if (window.confirm('Are you sure you want to delete this blog?')) {
             await dispatch(deleteBlog(id));
-            // Reload current page after deletion
-            dispatch(fetchBlogs(currentPage));
+            // Reload current page with current sort order after deletion
+            dispatch(fetchBlogs({ page: currentPage, sortOrder }));
         }
     };
 
-    // Sort blogs based on selected order
-    // We create a copy of the array before sorting to avoid mutating Redux state
-    const sortedBlogs = [...blogs].sort((a, b) => {
-        const dateA = new Date(a.created_at).getTime();
-        const dateB = new Date(b.created_at).getTime();
-
-        // If newest first, sort descending (b - a)
-        // If oldest first, sort ascending (a - b)
-        return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
-    });
+    // Handle sort order change
+    const handleSortChange = (newSortOrder: 'newest' | 'oldest') => {
+        setSortOrder(newSortOrder);
+        // Reset to page 1 when changing sort order
+        // This ensures users see the first page of the newly sorted results
+        setCurrentPage(1);
+    };
 
     // Show loading state
     if (loading) {
@@ -64,7 +63,7 @@ const BlogList: React.FC = () => {
                     <label style={{ fontSize: '14px', color: '#666' }}>Sort by:</label>
                     <select
                         value={sortOrder}
-                        onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
+                        onChange={(e) => handleSortChange(e.target.value as 'newest' | 'oldest')}
                         style={{
                             padding: '8px 12px',
                             borderRadius: '4px',
@@ -94,15 +93,16 @@ const BlogList: React.FC = () => {
             </div>
 
             {/* Show message if no blogs exist */}
-            {sortedBlogs.length === 0 ? (
+            {blogs.length === 0 ? (
                 <p style={{ textAlign: 'center', color: '#666' }}>
                     No blogs yet. Create your first blog!
                 </p>
             ) : (
                 <>
-                    {/* Map through sorted blogs and display each using BlogCard component */}
+                    {/* Map through blogs and display each using BlogCard component */}
+                    {/* NOTE: No client-side sorting needed - blogs come pre-sorted from database */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        {sortedBlogs.map((blog) => (
+                        {blogs.map((blog) => (
                             <BlogCard
                                 key={blog.id}
                                 blog={blog}

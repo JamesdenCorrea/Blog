@@ -3,47 +3,79 @@ import { supabase } from '../services/supabase';
 import { BlogState, Blog } from '../types';
 
 const initialState: BlogState = {
-    blogs: [],              // Empty array of blogs initially
-    currentBlog: null,      // No blog selected
-    loading: false,         // Not loading
-    error: null,            // No errors
-    totalPages: 0,          // No pages calculated yet
+    blogs: [],
+    currentBlog: null,
+    loading: false,
+    error: null,
+    totalPages: 0,
 };
 
-const ITEMS_PER_PAGE = 5;  // How many blogs to show per page
+const ITEMS_PER_PAGE = 5;
 
-// Async action to fetch blogs with pagination
-// Updated to include author email from auth.users table
+interface FetchBlogsParams {
+    page: number;
+    sortOrder?: 'newest' | 'oldest';
+}
+
+// Helper function to upload image to Supabase Storage
+const uploadImage = async (file: File, userId: string): Promise<{ url: string; path: string }> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const { data, error } = await supabase.storage
+        .from('blog-images')
+        .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+        });
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage
+        .from('blog-images')
+        .getPublicUrl(fileName);
+
+    return { url: publicUrl, path: fileName };
+};
+
+// Helper function to delete image from Supabase Storage
+const deleteImage = async (imagePath: string): Promise<void> => {
+    const { error } = await supabase.storage
+        .from('blog-images')
+        .remove([imagePath]);
+
+    if (error) throw error;
+};
+
+// Fetch blogs with pagination and sorting
 export const fetchBlogs = createAsyncThunk(
     'blogs/fetchBlogs',
-    async (page: number = 1) => {
+    async ({ page = 1, sortOrder = 'newest' }: FetchBlogsParams) => {
         const from = (page - 1) * ITEMS_PER_PAGE;
         const to = from + ITEMS_PER_PAGE - 1;
+        const ascending = sortOrder === 'oldest';
 
-        // Fetch from the view instead of the table
-        // This automatically includes author_email
-        const { data, error, count } = await supabase
-            .from('blogs_with_authors')
+        // Fetch blogs from database
+        // author_email is now stored directly in the blogs table
+        const { data: blogsData, error: blogsError, count } = await supabase
+            .from('blogs')
             .select('*', { count: 'exact' })
-            .order('created_at', { ascending: false })
+            .order('created_at', { ascending })
             .range(from, to);
 
-        if (error) throw error;
+        if (blogsError) throw blogsError;
 
         const totalPages = count ? Math.ceil(count / ITEMS_PER_PAGE) : 0;
-
-        return { blogs: data as Blog[], totalPages };
+        return { blogs: blogsData as Blog[], totalPages };
     }
 );
 
-// Async action to fetch a single blog by ID
-// Updated to include author email
+// Fetch a single blog by ID
 export const fetchBlogById = createAsyncThunk(
     'blogs/fetchBlogById',
     async (id: string) => {
-        // Fetch from the view instead of the table
         const { data, error } = await supabase
-            .from('blogs_with_authors')
+            .from('blogs')
             .select('*')
             .eq('id', id)
             .single();
@@ -53,65 +85,137 @@ export const fetchBlogById = createAsyncThunk(
     }
 );
 
+// Create a new blog with optional image
 export const createBlog = createAsyncThunk(
     'blogs/createBlog',
-    async ({ title, content }: { title: string; content: string }) => {
+    async ({ title, content, image }: { title: string; content: string; image?: File }) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not authenticated');
 
-        // Insert blog with a custom field for author email (if your table allows it)
-        // OR just return it in Redux without storing in DB
+        let imageUrl: string | undefined;
+        let imagePath: string | undefined;
+
+        // Upload image if provided
+        if (image) {
+            const uploadResult = await uploadImage(image, user.id);
+            imageUrl = uploadResult.url;
+            imagePath = uploadResult.path;
+        }
+
+        // Insert blog with author email stored directly
         const { data, error } = await supabase
             .from('blogs')
-            .insert([{ title, content, author_id: user.id }])
+            .insert([{
+                title,
+                content,
+                author_id: user.id,
+                author_email: user.email, // Store email directly
+                image_url: imageUrl,
+                image_path: imagePath
+            }])
             .select()
             .single();
 
         if (error) throw error;
 
-        // Add email to the returned data (stored in Redux, not DB)
-        return {
-            ...data,
-            author_email: user.email
-        } as Blog;
+        return data as Blog;
     }
 );
 
-// Async action to update an existing blog
+// Update an existing blog with optional image change
 export const updateBlog = createAsyncThunk(
     'blogs/updateBlog',
-    async ({ id, title, content }: { id: string; title: string; content: string }) => {
+    async ({
+        id,
+        title,
+        content,
+        image,
+        removeImage
+    }: {
+        id: string;
+        title: string;
+        content: string;
+        image?: File;
+        removeImage?: boolean;
+    }) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+
+        // Get existing blog to check for old image
+        const { data: existingBlog } = await supabase
+            .from('blogs')
+            .select('image_path')
+            .eq('id', id)
+            .single();
+
+        let imageUrl: string | undefined | null;
+        let imagePath: string | undefined | null;
+
+        // Handle image removal
+        if (removeImage && existingBlog?.image_path) {
+            await deleteImage(existingBlog.image_path);
+            imageUrl = null;
+            imagePath = null;
+        }
+        // Handle image upload (new or replacement)
+        else if (image) {
+            if (existingBlog?.image_path) {
+                await deleteImage(existingBlog.image_path);
+            }
+            const uploadResult = await uploadImage(image, user.id);
+            imageUrl = uploadResult.url;
+            imagePath = uploadResult.path;
+        }
+
+        // Update blog
+        const updateData: any = {
+            title,
+            content,
+            updated_at: new Date().toISOString()
+        };
+
+        // Only update image fields if they were modified
+        if (removeImage || image) {
+            updateData.image_url = imageUrl;
+            updateData.image_path = imagePath;
+        }
+
         const { data, error } = await supabase
             .from('blogs')
-            .update({ title, content, updated_at: new Date().toISOString() })
+            .update(updateData)
             .eq('id', id)
             .select()
             .single();
 
         if (error) throw error;
-
-        // After update, fetch from view to get author_email
-        const { data: blogData } = await supabase
-            .from('blogs_with_authors')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-        return blogData as Blog;
+        return data as Blog;
     }
 );
 
-// Async action to delete a blog
+// Delete a blog and its image
 export const deleteBlog = createAsyncThunk(
     'blogs/deleteBlog',
     async (id: string) => {
+        // Get blog to find image path
+        const { data: blog } = await supabase
+            .from('blogs')
+            .select('image_path')
+            .eq('id', id)
+            .single();
+
+        // Delete image from storage if exists
+        if (blog?.image_path) {
+            await deleteImage(blog.image_path);
+        }
+
+        // Delete blog from database
         const { error } = await supabase
             .from('blogs')
             .delete()
             .eq('id', id);
 
         if (error) throw error;
-        return id;  // Return the ID of deleted blog
+        return id;
     }
 );
 
@@ -120,14 +224,12 @@ const blogSlice = createSlice({
     name: 'blogs',
     initialState,
     reducers: {
-        // Synchronous action to clear current blog
         clearCurrentBlog: (state) => {
             state.currentBlog = null;
         },
     },
     extraReducers: (builder) => {
         builder
-            // Fetch blogs states
             .addCase(fetchBlogs.pending, (state) => {
                 state.loading = true;
                 state.error = null;
@@ -141,7 +243,6 @@ const blogSlice = createSlice({
                 state.loading = false;
                 state.error = action.error.message || 'Failed to fetch blogs';
             })
-            // Fetch single blog states
             .addCase(fetchBlogById.pending, (state) => {
                 state.loading = true;
             })
@@ -153,22 +254,17 @@ const blogSlice = createSlice({
                 state.loading = false;
                 state.error = action.error.message || 'Failed to fetch blog';
             })
-            // Create blog states
             .addCase(createBlog.fulfilled, (state, action) => {
-                state.blogs.unshift(action.payload);  // Add new blog to start of array
+                state.blogs.unshift(action.payload);
             })
-            // Update blog states
             .addCase(updateBlog.fulfilled, (state, action) => {
-                // Find and update the blog in the array
                 const index = state.blogs.findIndex(blog => blog.id === action.payload.id);
                 if (index !== -1) {
                     state.blogs[index] = action.payload;
                 }
                 state.currentBlog = action.payload;
             })
-            // Delete blog states
             .addCase(deleteBlog.fulfilled, (state, action) => {
-                // Remove deleted blog from array
                 state.blogs = state.blogs.filter(blog => blog.id !== action.payload);
             });
     },

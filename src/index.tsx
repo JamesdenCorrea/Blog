@@ -12,7 +12,7 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     {/* Provider makes Redux store available to all components */}
-    < Provider store={store} >
+    <Provider store={store}>
       <App />
     </Provider>
   </React.StrictMode>

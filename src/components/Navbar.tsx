@@ -30,7 +30,7 @@ const Navbar: React.FC = () => {
                 alignItems: 'center'
             }}>
                 <Link to="/" style={{ color: 'white', textDecoration: 'none', fontSize: '1.5rem', fontWeight: 'bold' }}>
-                    James Correa Blogs
+                    James Correa Blog
                 </Link>
 
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -75,5 +75,4 @@ const Navbar: React.FC = () => {
     );
 };
 
-// Export as default - IMPORTANT
 export default Navbar;
