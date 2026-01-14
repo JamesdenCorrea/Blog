@@ -3,46 +3,42 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { AppDispatch, RootState } from '../store';
 import { fetchBlogById, deleteBlog, clearCurrentBlog } from '../store/blogSlice';
+import { clearComments } from '../store/commentSlice';
+import CommentSection from '../components/CommentSection';
 
 const BlogDetail: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
 
-    // Get blog ID from URL (e.g., /blog/123)
     const { id } = useParams<{ id: string }>();
 
-    // Get current blog and user from Redux
     const { currentBlog, loading } = useSelector((state: RootState) => state.blogs);
     const { user } = useSelector((state: RootState) => state.auth);
 
-    // Fetch blog when component mounts
     useEffect(() => {
         if (id) {
             dispatch(fetchBlogById(id));
         }
 
-        // Cleanup: clear current blog when component unmounts
         return () => {
             dispatch(clearCurrentBlog());
+            dispatch(clearComments());
         };
     }, [dispatch, id]);
 
-    // Handle blog deletion
     const handleDelete = async () => {
         if (!id) return;
 
         if (window.confirm('Are you sure you want to delete this blog?')) {
             await dispatch(deleteBlog(id));
-            navigate('/');  // Redirect to home after deletion
+            navigate('/');
         }
     };
 
-    // Show loading state
     if (loading) {
         return <div style={{ textAlign: 'center', padding: '50px' }}>Loading blog...</div>;
     }
 
-    // Show error if blog not found
     if (!currentBlog) {
         return (
             <div style={{ textAlign: 'center', padding: '50px' }}>
@@ -64,12 +60,10 @@ const BlogDetail: React.FC = () => {
         );
     }
 
-    // Check if current user is the author of this blog
     const isAuthor = user && user.id === currentBlog.author_id;
 
     return (
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-            {/* Back button */}
             <Link to="/">
                 <button style={{
                     marginBottom: '20px',
@@ -84,7 +78,6 @@ const BlogDetail: React.FC = () => {
                 </button>
             </Link>
 
-            {/* Blog content card */}
             <div style={{
                 border: '1px solid #ddd',
                 borderRadius: '8px',
@@ -92,7 +85,6 @@ const BlogDetail: React.FC = () => {
                 backgroundColor: 'white',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}>
-                {/* Featured Image */}
                 {currentBlog.image_url && (
                     <img
                         src={currentBlog.image_url}
@@ -107,7 +99,6 @@ const BlogDetail: React.FC = () => {
                     />
                 )}
 
-                {/* Blog title */}
                 <h1 style={{
                     marginTop: 0,
                     marginBottom: '20px',
@@ -117,7 +108,6 @@ const BlogDetail: React.FC = () => {
                     {currentBlog.title}
                 </h1>
 
-                {/* Author and date info */}
                 <div style={{
                     display: 'flex',
                     gap: '20px',
@@ -139,7 +129,6 @@ const BlogDetail: React.FC = () => {
                             minute: '2-digit'
                         })}
                     </div>
-                    {/* Show update date if different from creation date */}
                     {currentBlog.updated_at !== currentBlog.created_at && (
                         <div>
                             <strong>Updated:</strong> {new Date(currentBlog.updated_at).toLocaleDateString('en-US', {
@@ -151,18 +140,16 @@ const BlogDetail: React.FC = () => {
                     )}
                 </div>
 
-                {/* Full blog content */}
                 <div style={{
                     lineHeight: '1.8',
                     fontSize: '16px',
                     color: '#333',
-                    whiteSpace: 'pre-wrap',  // Preserve line breaks from the author
-                    wordWrap: 'break-word'    // Wrap long words
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word'
                 }}>
                     {currentBlog.content}
                 </div>
 
-                {/* Edit and Delete buttons (only show to author) */}
                 {isAuthor && (
                     <div style={{
                         display: 'flex',
@@ -201,6 +188,9 @@ const BlogDetail: React.FC = () => {
                         </button>
                     </div>
                 )}
+
+                {/* Comment Section */}
+                {id && <CommentSection blogId={id} />}
             </div>
         </div>
     );
